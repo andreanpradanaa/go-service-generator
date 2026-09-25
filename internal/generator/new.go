@@ -19,8 +19,9 @@ type NewOptions struct {
 	WithGateway bool // gateway client + psp-id/signature request filter
 	Postgres    bool
 	Redis       bool
-	Example     bool // generate an example feature
-	Tidy        bool // run `go mod tidy` afterwards
+	Example     bool     // generate an example feature
+	Externals   []string // partner clients to add, see AddExternal
+	Tidy        bool     // run `go mod tidy` afterwards
 	GitInit     bool
 }
 
@@ -96,6 +97,12 @@ func New(opts NewOptions) (string, error) {
 	if opts.Example {
 		if _, err := AddFeature(FeatureOptions{Dir: dir, Name: "example", Action: "ping", Method: "POST"}); err != nil {
 			return dir, fmt.Errorf("example feature: %w", err)
+		}
+	}
+
+	for _, ext := range opts.Externals {
+		if _, err := AddExternal(ExternalOptions{Dir: dir, Name: ext}); err != nil {
+			return dir, fmt.Errorf("external %s: %w", ext, err)
 		}
 	}
 

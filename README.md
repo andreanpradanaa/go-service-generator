@@ -47,9 +47,20 @@ svcgen new iconpay-dana-integrator --port 6002
 | `--port` | `6001` | port HTTP |
 | `--gateway` | `true` | client `external/gateway` + request filter `psp-id`/`timestamp`/`signature` |
 | `--postgres` / `--redis` | `true` | nilai default `enable` data source di config |
+| `--external` | *(ditanya)* | package external partner, pisahkan dengan koma (`dana,ovo`). Kalau tidak diisi, svcgen bertanya dulu; `--external=""` = tanpa external |
 | `--example` | `false` | contoh feature `POST /api/v1/example/ping` |
 | `--tidy` | `true` | jalankan `go mod tidy` |
 | `--git` | `true` | `git init` dengan branch `development` |
+
+Kalau `--external` tidak diisi, svcgen bertanya dulu:
+
+```
+Buat package external untuk partner? (y/N): y
+Nama partner (pisahkan dengan koma, contoh: dana,ovo): dana
+```
+
+Jawab `N` (atau Enter) untuk melewati; package external tetap bisa ditambah nanti dengan `svcgen add external`.
+Pertanyaan ini dilewati kalau stdin bukan terminal (misalnya di script/CI).
 
 ### Tambah partner (external client)
 
