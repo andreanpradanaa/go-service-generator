@@ -8,8 +8,8 @@ fx + fiber + `repo-iconx.air.id/icon-digital-library/common`, lengkap dengan Doc
 Repo ini private, jadi Go perlu tahu module-nya private:
 
 ```bash
-go env -w GOPRIVATE='repo-iconx.air.id/*,github.com/andreanpradana/*'
-go install github.com/andreanpradana/go-service-generator/cmd/svcgen@latest
+go env -w GOPRIVATE='repo-iconx.air.id/*,github.com/andreanpradanaa/*'
+go install github.com/andreanpradanaa/go-service-generator/cmd/svcgen@latest
 ```
 
 Atau dari source: `go build -o svcgen ./cmd/svcgen`.
