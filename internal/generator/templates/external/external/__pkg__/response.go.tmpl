@@ -1,0 +1,48 @@
+package {{.Name.Lower}}
+
+type BaseResponse struct {
+	ResponseCode    string `json:"responseCode"`
+	ResponseMessage string `json:"responseMessage"`
+	Status          string `json:"-"`
+}
+
+func (r *BaseResponse) Code() string       { return r.ResponseCode }
+func (r *BaseResponse) Message() string    { return r.ResponseMessage }
+func (r *BaseResponse) SetStatus(s string) { r.Status = s }
+
+func (r *BaseResponse) Apply(code, message, status string) {
+	r.ResponseCode = code
+	r.ResponseMessage = message
+	r.Status = status
+}
+
+const (
+	StatusSuccess = "SUCCESS"
+	StatusPending = "PENDING"
+	StatusFailed  = "FAILED"
+)
+
+func StatusOf(code string) string {
+	if len(code) == 0 {
+		return StatusPending
+	}
+	switch code[0] {
+	case '2':
+		return StatusSuccess
+	case '4':
+		return StatusFailed
+	default:
+		return StatusPending
+	}
+}
+
+type ResponseCode struct {
+	Code    string
+	Message string
+	Status  string
+}
+
+var (
+	Timeout      = ResponseCode{Code: "5040000", Message: "Timeout", Status: StatusPending}
+	GeneralError = ResponseCode{Code: "5000000", Message: "General Error", Status: StatusPending}
+)

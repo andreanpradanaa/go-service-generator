@@ -1,0 +1,135 @@
+package controller
+
+import (
+	"context"
+	"errors"
+	"{{.Module}}/internal/model/cerror"
+	"{{.Module}}/internal/model/rc"
+	"reflect"
+	"strings"
+
+	"github.com/go-playground/validator/v10"
+	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
+	"go.uber.org/fx"
+)
+
+var Module = fx.Provide(
+	// svcgen:controllers
+)
+
+func ParsePathParams[T any](ctx *fiber.Ctx) (*T, error) {
+	var params T
+	if err := ctx.ParamsParser(&params); err != nil {
+		log.
+			Ctx(ctx.UserContext()).
+			Err(err).
+			Msg("Failed to parse path params")
+		return nil, cerror.NewInfoLevelException().Map(rc.BadRequest(rc.ServiceCodeFor(ctx.Path())))
+	}
+	return &params, nil
+}
+
+func ParseRequestBody[T any](ctx *fiber.Ctx) (*T, error) {
+	var request T
+
+	parse := ctx.BodyParser
+	if ctx.Method() == fiber.MethodGet {
+		parse = ctx.QueryParser
+	}
+	if err := parse(&request); err != nil {
+		log.
+			Ctx(ctx.UserContext()).
+			Err(err).
+			Msg("Failed to parse request")
+		return nil, cerror.NewInfoLevelException().Map(rc.BadRequest(rc.ServiceCodeFor(ctx.Path())))
+	}
+
+	return &request, nil
+}
+
+func ParseAndValidate[T any](c *fiber.Ctx, validate *validator.Validate) (*T, error) {
+	request, err := ParseRequestBody[T](c)
+	if err != nil {
+		return nil, err
+	}
+	if err := ValidateRequestBody(validate, c.UserContext(), rc.ServiceCodeFor(c.Path()), request); err != nil {
+		return nil, err
+	}
+	return request, nil
+}
+
+func ValidateRequestBody(validate *validator.Validate, ctx context.Context, serviceCode string, request any) error {
+	err := validate.StructCtx(ctx, request)
+	if err == nil {
+		return nil
+	}
+
+	validateErrs, ok := errors.AsType[validator.ValidationErrors](err)
+	if !ok {
+		return err
+	}
+
+	mapped := rc.BadRequest(serviceCode)
+	if customErrors := GetCustomErrorMessages(err, request); len(customErrors) > 0 {
+		return cerror.NewInfoLevelException().Map(mapped).Message(customErrors[0].Message)
+	}
+
+	log.
+		Ctx(ctx).
+		Warn().
+		Msgf("Failed to validate request body: %s", err.Error())
+	return cerror.NewInfoLevelException().Map(mapped).Message(validateErrs.Error())
+}
+
+const customErrorTag = "errormsg"
+
+type CustomError struct {
+	Field   string `json:"field"`
+	Message string `json:"message"`
+	Tag     string `json:"tag"`
+}
+
+func GetCustomErrorMessages(err error, s any) []CustomError {
+	var customErrors []CustomError
+
+	var errorValidation validator.ValidationErrors
+	if !errors.As(err, &errorValidation) {
+		return nil
+	}
+
+	structType := reflect.TypeOf(s)
+	if structType.Kind() == reflect.Ptr {
+		structType = structType.Elem()
+	}
+
+	for _, fieldError := range errorValidation {
+		fieldName := fieldError.Namespace()
+		if _, after, found := strings.Cut(fieldName, "."); found {
+			fieldName = after
+		}
+
+		field, found := structType.FieldByName(fieldName)
+		if !found {
+			customErrors = append(customErrors, CustomError{
+				Field:   fieldName,
+				Message: "Invalid Field Format " + fieldName,
+				Tag:     fieldError.Tag(),
+			})
+			continue
+		}
+
+		jsonTag := strings.SplitN(field.Tag.Get("json"), ",", 2)[0]
+		message := field.Tag.Get(customErrorTag)
+		if message == "" {
+			message = strings.ReplaceAll(fieldError.Error(), "{field name}", jsonTag)
+		}
+		customErrors = append(customErrors, CustomError{
+			Field:   jsonTag,
+			Message: message,
+			Tag:     fieldError.Tag(),
+		})
+	}
+
+	return customErrors
+}

@@ -1,0 +1,49 @@
+package appconfig
+
+import (
+	"time"
+
+	"github.com/rs/zerolog/log"
+	"go.uber.org/fx"
+	"repo-iconx.air.id/icon-digital-library/common/config"
+)
+
+var Module = fx.Provide(
+	provideConfig,
+	provideCORSConfig,
+)
+
+type (
+	// AppConfig holds this application's own settings under the "app" key.
+	// Add fields here (with a matching entry in resources/config.yml) for
+	// anything that is not a partner client config under app.external.
+	AppConfig struct {
+		CORSConfig CORSConfig `key:"cors"`
+	}
+
+	CORSConfig struct {
+		AllowOrigins     string        `key:"allow-origins"`
+		AllowMethods     string        `key:"allow-methods"`
+		AllowHeaders     string        `key:"allow-headers"`
+		AllowCredentials bool          `key:"allow-credentials"`
+		MaxAge           time.Duration `key:"max-age"`
+	}
+)
+
+func provideConfig(baseConfig *config.BaseConfig) *AppConfig {
+	log.Info().Msgf("config profile: %s", baseConfig.Profile)
+
+	cfg, err := config.LoadConfigWithKey[*AppConfig]("app")
+	if err != nil {
+		log.
+			Fatal().
+			Err(err).
+			Msg("Failed to load config application")
+	}
+
+	return cfg
+}
+
+func provideCORSConfig(appConfig *AppConfig) *CORSConfig {
+	return &appConfig.CORSConfig
+}

@@ -1,0 +1,46 @@
+package controller
+
+import (
+	"{{.Module}}/internal/model/dto"
+	"{{.Module}}/internal/usecase"
+	"{{.Module}}/pkg/http"
+
+	"github.com/go-playground/validator/v10"
+	"github.com/gofiber/fiber/v2"
+)
+
+type (
+	{{.Feature.Pascal}}Controller interface {
+		{{.Action.Pascal}}(c *fiber.Ctx) error
+	}
+
+	{{.Feature.Camel}}Controller struct {
+		validator *validator.Validate
+		usecase   usecase.{{.Feature.Pascal}}Usecase
+	}
+)
+
+func new{{.Feature.Pascal}}Controller(
+	validator *validator.Validate,
+	usecase usecase.{{.Feature.Pascal}}Usecase,
+) {{.Feature.Pascal}}Controller {
+	return &{{.Feature.Camel}}Controller{
+		validator: validator,
+		usecase:   usecase,
+	}
+}
+
+func (o *{{.Feature.Camel}}Controller) {{.Action.Pascal}}(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	request, err := ParseAndValidate[dto.{{.Type}}Request](c, o.validator)
+	if err != nil {
+		return err
+	}
+
+	response, err := o.usecase.{{.Action.Pascal}}(ctx, request)
+	if err != nil {
+		return err
+	}
+
+	return http.OKAll(c, response.ResponseCode, response.ResponseMessage, response)
+}

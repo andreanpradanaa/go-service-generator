@@ -1,0 +1,54 @@
+package cerror
+
+import (
+	"errors"
+	"{{.Module}}/internal/model/rc"
+)
+
+// ErrTimeout marks an error as caused by a partner call timing out, as
+// opposed to a connection reset or other transport failure. External clients
+// wrap it (fmt.Errorf("%w: %w", cerror.ErrTimeout, err)) so the exception
+// handler can answer with a Timeout response code.
+var ErrTimeout = errors.New("external request timed out")
+
+type InfoLevelException struct {
+	ResponseMessage *string
+	ResponseCode    *string
+	HTTPStatusCode  *int
+}
+
+func NewInfoLevelException() *InfoLevelException {
+	fallback := rc.InternalServerError("00")
+	return &InfoLevelException{
+		ResponseMessage: &fallback.ResponseMessage,
+		HTTPStatusCode:  &fallback.HTTPStatusCode,
+		ResponseCode:    &fallback.ResponseCode,
+	}
+}
+
+func (r *InfoLevelException) Error() string {
+	return *r.ResponseMessage
+}
+
+func (r *InfoLevelException) Message(msg string) *InfoLevelException {
+	r.ResponseMessage = &msg
+	return r
+}
+
+func (r *InfoLevelException) Code(responseCode string) *InfoLevelException {
+	r.ResponseCode = &responseCode
+	return r
+}
+
+func (r *InfoLevelException) StatusCode(httpCode int) *InfoLevelException {
+	r.HTTPStatusCode = &httpCode
+	return r
+}
+
+func (r *InfoLevelException) Map(response rc.Response) *InfoLevelException {
+	return &InfoLevelException{
+		ResponseMessage: &response.ResponseMessage,
+		HTTPStatusCode:  &response.HTTPStatusCode,
+		ResponseCode:    &response.ResponseCode,
+	}
+}

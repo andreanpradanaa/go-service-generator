@@ -1,0 +1,13 @@
+package {{.Name.Lower}}
+
+import (
+	"repo-iconx.air.id/icon-digital-library/common/httpclient"
+	"resty.dev/v3"
+)
+
+func provideHTTPClient(cfg *{{.Name.Pascal}}) *resty.Client {
+	restyCfg := httpclient.NewRestyConfigDefault()
+	restyCfg.BaseURL = cfg.BaseURL
+
+	return httpclient.NewRestyClient(restyCfg)
+}

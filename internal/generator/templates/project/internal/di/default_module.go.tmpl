@@ -1,0 +1,30 @@
+package di
+
+import (
+	"{{.Module}}/internal/resources"
+
+	"github.com/rs/zerolog/log"
+	"go.uber.org/fx"
+	"repo-iconx.air.id/icon-digital-library/common/config"
+	"repo-iconx.air.id/icon-digital-library/common/logger"
+)
+
+var defaultModule = fx.Provide(
+	provideBaseConfig,
+)
+
+func provideBaseConfig() *config.BaseConfig {
+	err := config.ReadConfig(resources.Config)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to read config application")
+	}
+
+	cfg, err := config.LoadConfigWithKey[*config.BaseConfig]("app")
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to load config application")
+	}
+
+	logger.Configure(cfg.Profile)
+
+	return cfg
+}

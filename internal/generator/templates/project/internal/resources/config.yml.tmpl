@@ -1,0 +1,38 @@
+app:
+  profile: ${ APP_PROFILE | development } # OVERRIDE to production
+  name: ${ APP_NAME | {{.AppName}} }
+  commit-id: ${ APP_COMMIT_ID | none }
+  graceful-timeout: ${ APP_GRACEFUL_TIMEOUT | 1m } # Graceful shutdown
+  data-source:
+    postgres:
+      enable: ${ APP_DATA_SOURCE_POSTGRES_ENABLE | {{.Postgres}} }
+      url: ${ APP_DATA_SOURCE_POSTGRES_URL | postgresql://CHANGE_ME:CHANGE_ME@localhost:5432/CHANGE_ME?pool_max_conns=20 }
+    redis:
+      enable: ${ APP_DATA_SOURCE_REDIS_ENABLE | {{.Redis}} }
+      url: ${ APP_DATA_SOURCE_REDIS_URL | redis://:CHANGE_ME@localhost:6379/0 }
+      mode: ${ APP_REDIS_MODE | standalone } # standalone, cluster, sentinel
+      prefix-key: ${ APP_REDIS_PREFIX | "{{.RedisPrefix}}" }
+  server:
+    fiber:
+      enable: ${ APP_SERVER_FIBER_ENABLE | true }
+      port: ${ APP_SERVER_FIBER_PORT | {{.Port}} }
+      use-sb: ${ APP_SERVER_FIBER_USE_SB | true }
+      servlet-path: ${ APP_SERVER_FIBER_SERVLET_PATH | / }
+      base-url: ${ APP_SERVER_FIBER_BASE_URL | http://localhost:{{.Port}} }
+      use-swagger: ${ APP_SERVER_FIBER_USE_SWAGGER | false }
+      options:
+        prefork: ${ APP_SERVER_FIBER_OPTIONS_PREFORK | false }
+        app_SERVER_FIBER_name: ${ APP_SERVER_FIBER_OPTIONS_NAME | {{.AppName}} }
+    grpc:
+      enable: ${ APP_SERVER_GRPC_ENABLE | false }
+  logger:
+    level: ${ APP_LOGGER_LEVEL | debug }
+  external:
+{{- if .WithGateway}}
+    gateway:
+      base-url: ${ APP_EXTERNAL_GATEWAY_BASE_URL | svc-iconpay-account-registration-gateway:32011 }
+      psp-id: ${ APP_EXTERNAL_GATEWAY_PSP_ID | CHANGE_ME }
+      client-secret: ${ APP_EXTERNAL_GATEWAY_CLIENT_SECRET | CHANGE_ME }
+      timeout: ${ APP_EXTERNAL_GATEWAY_TIMEOUT | 30s }
+{{- end}}
+    # svcgen:external

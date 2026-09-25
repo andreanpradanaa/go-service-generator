@@ -1,0 +1,23 @@
+package {{.Name.Lower}}
+
+import (
+	"time"
+
+	"github.com/rs/zerolog/log"
+	"repo-iconx.air.id/icon-digital-library/common/config"
+)
+
+type {{.Name.Pascal}} struct {
+	BaseURL      string        `key:"base-url"`
+	ClientID     string        `key:"client-id"`
+	ClientSecret string        `key:"client-secret"`
+	Timeout      time.Duration `key:"timeout"`
+}
+
+func provideConfig() *{{.Name.Pascal}} {
+	cfg, err := config.LoadConfigWithKey[*{{.Name.Pascal}}]("app.external.{{.Name.Kebab}}")
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to load config app.external.{{.Name.Kebab}}")
+	}
+	return cfg
+}

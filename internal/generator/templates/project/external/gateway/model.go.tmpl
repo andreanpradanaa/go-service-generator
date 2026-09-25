@@ -1,0 +1,63 @@
+package gateway
+
+import (
+	"fmt"
+	"strings"
+)
+
+type (
+	RegistrationUpdateRequest struct {
+		LinkAgeId   string      `json:"linkAgeId"`
+		PhoneNumber string      `json:"phoneNumber"`
+		Status      string      `json:"status"`
+		UserIDPLNM  string      `json:"userIdPLNM"`
+		AccountInfo AccountInfo `json:"accountInfo"`
+	}
+
+	AccountInfo struct {
+		ProviderAccessToken        string `json:"providerAccessToken"`
+		ProviderRefreshToken       string `json:"providerRefreshToken"`
+		ProviderAccessTokenExpiry  int64  `json:"providerAccessTokenExpiry"`  // unix timestamp in seconds
+		ProviderRefreshTokenExpiry int64  `json:"providerRefreshTokenExpiry"` // unix timestamp in seconds
+	}
+
+	RegistrationUpdateResponse struct {
+		BaseResponse
+	}
+)
+
+func (r *RegistrationUpdateRequest) FormatPhoneNumber() error {
+	phone := strings.TrimSpace(r.PhoneNumber)
+
+	if after, ok := strings.CutPrefix(phone, "+62"); ok {
+		r.PhoneNumber = "62" + after
+		return nil
+	}
+
+	if after, ok := strings.CutPrefix(phone, "62"); ok {
+		r.PhoneNumber = "62" + after
+		return nil
+	}
+
+	if after, ok := strings.CutPrefix(phone, "0"); ok {
+		r.PhoneNumber = "62" + after
+		return nil
+	}
+
+	return fmt.Errorf("invalid phone number format")
+}
+
+type (
+	PurchaseUpdateRequest struct {
+		BillKey           string `json:"billKey"`
+		PSPId             string `json:"pspId"`
+		Amount            int64  `json:"amount"`
+		PaymentSettlement string `json:"paymentSettlement"`
+		TransactionId     string `json:"transactionId"`
+		Status            string `json:"status"`
+	}
+
+	PurchaseUpdateResponse struct {
+		BaseResponse
+	}
+)

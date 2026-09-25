@@ -1,0 +1,18 @@
+package router
+
+import (
+	"{{.Module}}/internal/router/exception"
+	"{{.Module}}/internal/router/filter"
+
+	"go.uber.org/fx"
+)
+
+var Module = fx.Options(
+	exception.Module,
+	filter.Module,
+	routerModule,
+)
+
+var routerModule = fx.Provide(
+	// svcgen:routes
+)

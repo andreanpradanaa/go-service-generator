@@ -1,0 +1,11 @@
+package {{.Name.Lower}}
+
+import "go.uber.org/fx"
+
+const httpClientName = `name:"{{.Name.Camel}}HTTPClient"`
+
+var Module = fx.Provide(
+	provideConfig,
+	fx.Annotate(provideHTTPClient, fx.ResultTags(httpClientName)),
+	fx.Annotate(NewClient, fx.ParamTags(httpClientName, "")),
+)

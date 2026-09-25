@@ -1,0 +1,118 @@
+package gateway
+
+import (
+	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"{{.Module}}/internal/model/cerror"
+	"net"
+	"net/http"
+	"time"
+
+	"resty.dev/v3"
+)
+
+const (
+	pathRegistrationUpdate = "/api/psp/v1.0/account-registration/update"
+	pathPurchaseUpdate     = "/api/psp/v1.0/purchase/update"
+)
+
+type Client struct {
+	http   *resty.Client
+	config *Gateway
+}
+
+func NewClient(
+	http *resty.Client,
+	config *Gateway,
+) *Client {
+	return &Client{
+		http:   http,
+		config: config,
+	}
+}
+
+func (c *Client) request(ctx context.Context, req any, result any) *resty.Request {
+	return c.http.R().
+		SetTimeout(c.config.Timeout).
+		SetContext(ctx).
+		SetBody(req).
+		SetResult(result).
+		SetError(result)
+}
+
+type classifiable interface {
+	Code() string
+	Message() string
+	SetStatus(string)
+	Apply(code, message, status string)
+}
+
+func isTimeout(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return true
+	}
+
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
+func (c *Client) do(ctx context.Context, op, method, path string, req, result any, timeout, general ResponseCode) error {
+	cr := result.(classifiable)
+	timestamp := time.Now().Format(time.RFC3339)
+
+	signature := generateSignature(c.config.PspId, timestamp, c.config.ClientSecret)
+	r := c.request(ctx, req, result).SetHeaders(
+		map[string]string{
+			"psp-id":    c.config.PspId,
+			"timestamp": timestamp,
+			"signature": signature,
+		},
+	)
+	var (
+		resp *resty.Response
+		err  error
+	)
+	if method == http.MethodGet {
+		resp, err = r.Get(c.config.BaseURL + path)
+	} else {
+		resp, err = r.Post(c.config.BaseURL + path)
+	}
+	if err != nil {
+		rc := general
+		if isTimeout(err) {
+			rc = timeout
+			err = fmt.Errorf("%w: %w", cerror.ErrTimeout, err)
+		}
+		cr.Apply(rc.Code, rc.Message, rc.Status)
+		return err
+	}
+
+	cr.SetStatus(StatusOf(cr.Code()))
+
+	if resp.IsError() {
+		return fmt.Errorf("gateway %s failed: %s %s", op, cr.Code(), cr.Message())
+	}
+
+	return nil
+}
+
+func generateSignature(pspID, timestamp, secretKey string) string {
+	message := pspID + ":" + timestamp
+	mac := hmac.New(sha256.New, []byte(secretKey))
+	mac.Write([]byte(message))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func (c *Client) RegistrationUpdate(ctx context.Context, req *RegistrationUpdateRequest) (*RegistrationUpdateResponse, error) {
+	var result RegistrationUpdateResponse
+	return &result, c.do(ctx, "registration update", http.MethodPost, pathRegistrationUpdate, req, &result, Timeout, GeneralError)
+}
+
+func (c *Client) PurchaseUpdate(ctx context.Context, req *PurchaseUpdateRequest) (*PurchaseUpdateResponse, error) {
+	var result PurchaseUpdateResponse
+	return &result, c.do(ctx, "purchase update", http.MethodPost, pathPurchaseUpdate, req, &result, Timeout, GeneralError)
+}

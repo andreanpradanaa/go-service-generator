@@ -1,0 +1,57 @@
+package di
+
+import (
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/go-playground/validator/v10"
+	"github.com/rs/zerolog/log"
+	"go.uber.org/fx"
+	validator2 "repo-iconx.air.id/icon-digital-library/common/validator"
+)
+
+var validatorModule = fx.Provide(provideValidator)
+
+var (
+	allowPaddingRegex            = regexp.MustCompile(`^[0-9\s]*$`)
+	paddingPrefixWithNumberRegex = regexp.MustCompile(`^\s*\d+$`)
+)
+
+var customValidator = map[string]func(fl validator.FieldLevel) bool{
+	"allow_padding": func(fl validator.FieldLevel) bool {
+		return allowPaddingRegex.MatchString(fl.Field().String())
+	},
+	"time_rfc3339": func(fl validator.FieldLevel) bool {
+		timestamp := fl.Field().String()
+		parsedTime, err := time.Parse(time.RFC3339, timestamp)
+		if err != nil {
+			return false
+		}
+
+		_, offset := parsedTime.Zone()
+		if offset == 0 {
+			return false
+		}
+
+		formatted := parsedTime.Format(time.RFC3339)
+		return strings.HasPrefix(formatted, timestamp[:len(formatted)])
+	},
+	"currency": func(fl validator.FieldLevel) bool {
+		return fl.Field().String() == ("IDR")
+	},
+	"allow_pad_prefix_and_number": func(fl validator.FieldLevel) bool {
+		return paddingPrefixWithNumberRegex.MatchString(fl.Field().String())
+	},
+}
+
+func provideValidator(goValidator *validator2.GoValidator) *validator.Validate {
+	v := goValidator.Validator()
+	for key, value := range customValidator {
+		err := v.RegisterValidation(key, value)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to register validation")
+		}
+	}
+	return v
+}

@@ -1,0 +1,90 @@
+package di
+
+import (
+	"context"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/rs/xid"
+	"github.com/rs/zerolog/log"
+	"go.uber.org/fx"
+	"resty.dev/v3"
+)
+
+var httpClientModule = fx.Provide(
+	newDefaultRestyClient,
+)
+
+func newDefaultRestyClient(lifecycle fx.Lifecycle) *resty.Client {
+	client := resty.New()
+	client.SetHeader(fiber.HeaderContentType, "application/json")
+	client.SetResponseBodyUnlimitedReads(true)
+
+	if lifecycle != nil {
+		lifecycle.Append(fx.StopHook(client.Close))
+	}
+
+	client.SetCircuitBreaker(resty.NewCircuitBreakerWithCount(20, 1, 15*time.Second))
+
+	client.AddRequestMiddleware(resty.PrepareRequestMiddleware)
+
+	var ctxStartTimeKey = "reqStartTime"
+
+	client.AddRequestMiddleware(func(client *resty.Client, request *resty.Request) error {
+		requestId := xid.New().String()
+		ctx := request.Context()
+
+		startTime := time.Now()
+		ctx = context.WithValue(ctx, ctxStartTimeKey, startTime)
+
+		ctx = log.With().
+			Str("requestId", requestId).
+			Str("url", request.URL).
+			Str("method", request.Method).
+			Any("requestBody", request.Body).
+			Logger().
+			WithContext(ctx)
+
+		request.SetContext(ctx)
+
+		log.Ctx(ctx).Info().Msg("Requesting...")
+
+		return nil
+	})
+
+	client.AddResponseMiddleware(func(client *resty.Client, response *resty.Response) error {
+		ctx := response.Request.Context()
+
+		startTime, ok := ctx.Value(ctxStartTimeKey).(time.Time)
+		if !ok {
+			startTime = time.Now()
+		}
+		tookTime := time.Since(startTime).Milliseconds()
+
+		respBodyBytes := response.Bytes()
+
+		const maxLogSize = 10 * 1024
+		if len(respBodyBytes) > maxLogSize {
+			respBodyBytes = append(respBodyBytes[:maxLogSize], []byte("...(truncated)")...)
+		}
+
+		log.Ctx(ctx).
+			Info().
+			Int64("tookTimeMs", tookTime).
+			RawJSON("response", respBodyBytes).
+			Msg("Response")
+
+		log.Ctx(ctx).
+			Trace().
+			Int64("tookTimeMs", tookTime).
+			RawJSON("response", respBodyBytes).
+			Any("Trace", response.Request.TraceInfo()).
+			Any("requestHeaders", response.Request.Header).
+			Any("responseHeaders", response.Header()).
+			Msg("Response Trace")
+
+		return nil
+	})
+
+	return client
+}

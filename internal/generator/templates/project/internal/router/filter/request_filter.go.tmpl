@@ -1,0 +1,115 @@
+package filter
+
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"{{.Module}}/external/gateway"
+	"{{.Module}}/internal/model/cerror"
+	"{{.Module}}/internal/model/rc"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
+	"repo-iconx.air.id/icon-digital-library/common/sbrest"
+	"repo-iconx.air.id/icon-digital-library/common/snap"
+)
+
+type requestFilter struct {
+	gateway *gateway.Gateway
+}
+
+func newRequestFilter(
+	gateway *gateway.Gateway,
+) sbrest.Filter {
+	return &requestFilter{
+		gateway: gateway,
+	}
+}
+
+func (r *requestFilter) Order() int {
+	return 1
+}
+
+func (r *requestFilter) Priority() sbrest.FilterPriority {
+	return sbrest.FilterPriorityHigh
+}
+
+func (r *requestFilter) PrefixPaths() []string {
+	return []string{
+		"/api/v1",
+	}
+}
+
+func (r *requestFilter) Filter(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	serviceCode := rc.ServiceCodeFor(c.Path())
+
+	pspId := c.Request().Header.Peek("psp-id")
+	signature := c.Request().Header.Peek("signature")
+	timestamp := c.Request().Header.Peek("timestamp")
+
+	if len(timestamp) == 0 {
+		log.
+			Ctx(ctx).
+			Error().
+			Str("serviceCode", serviceCode).
+			Msg("missing header timestamp")
+
+		return cerror.NewInfoLevelException().Map(rc.MissingHeaderTimestamp(serviceCode))
+	}
+
+	if err := snap.ValidateTimestamp(string(timestamp)); err != nil {
+		log.
+			Ctx(ctx).
+			Error().
+			Str("serviceCode", serviceCode).
+			Msg("invalid header timestamp")
+		return cerror.NewInfoLevelException().Map(rc.InvalidHeaderTimestamp(serviceCode))
+	}
+
+	if len(pspId) == 0 {
+		log.
+			Ctx(ctx).
+			Error().
+			Str("serviceCode", serviceCode).
+			Msg("missing header psp-id")
+		return cerror.NewInfoLevelException().Map(rc.MissingHeaderPspId(serviceCode))
+	}
+
+	if string(pspId) != r.gateway.PspId {
+		log.
+			Ctx(ctx).
+			Error().
+			Str("serviceCode", serviceCode).
+			Msg("invalid header psp-id")
+		return cerror.NewInfoLevelException().Map(rc.ClientNotFound(serviceCode))
+	}
+
+	if len(signature) == 0 {
+		log.
+			Ctx(ctx).
+			Error().
+			Str("serviceCode", serviceCode).
+			Msg("missing header signature")
+		return cerror.NewInfoLevelException().Map(rc.MissingHeaderSignature(serviceCode))
+	}
+
+	generatedSignature := generateSignature(string(pspId), string(timestamp), r.gateway.ClientSecret)
+	if signature != nil && string(signature) != generatedSignature {
+		log.
+			Ctx(ctx).
+			Error().
+			Str("serviceCode", serviceCode).
+			Msg("invalid header signature")
+		return cerror.NewInfoLevelException().Map(rc.InvalidHeaderSignature(serviceCode))
+	}
+
+	return c.Next()
+}
+
+func generateSignature(pspID, timestamp, secretKey string) string {
+	message := pspID + ":" + timestamp
+	mac := hmac.New(sha256.New, []byte(secretKey))
+	mac.Write([]byte(message))
+	return hex.EncodeToString(mac.Sum(nil))
+}

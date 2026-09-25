@@ -1,0 +1,15 @@
+package dto
+
+type (
+	{{.Type}}Request struct {
+		// Example: UserID string `json:"userId" validate:"required"`
+	}
+
+	{{.Type}}Response struct {
+		BaseResponse
+		Data {{.Type}}ResponseData `json:"data"`
+	}
+
+	{{.Type}}ResponseData struct {
+	}
+)

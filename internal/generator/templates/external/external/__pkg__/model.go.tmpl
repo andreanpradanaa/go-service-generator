@@ -1,0 +1,9 @@
+package {{.Name.Lower}}
+
+// Request / response models for the {{.Name.Title}} API. Embed BaseResponse in
+// every response so Client.do can classify it, e.g.
+//
+//	InquiryResponse struct {
+//		BaseResponse
+//		AccountName string `json:"accountName"`
+//	}

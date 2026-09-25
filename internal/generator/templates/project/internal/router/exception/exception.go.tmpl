@@ -1,0 +1,67 @@
+package exception
+
+import (
+	"errors"
+	"{{.Module}}/internal/model/cerror"
+	"{{.Module}}/internal/model/dto"
+	"{{.Module}}/internal/model/rc"
+	"{{.Module}}/pkg/http"
+	"strings"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
+	"go.uber.org/fx"
+	"repo-iconx.air.id/icon-digital-library/common/sbrest"
+)
+
+var Module = fx.Provide(
+	fx.Annotate(
+		newDefaultExceptionHandler,
+		fx.ResultTags(`group:"route-exception"`),
+	),
+)
+
+type DefaultExceptionHandler struct {
+}
+
+func newDefaultExceptionHandler() sbrest.ExceptionHandler {
+	return &DefaultExceptionHandler{}
+}
+
+func (r *DefaultExceptionHandler) Order() int {
+	return 0
+}
+
+func (r *DefaultExceptionHandler) Handle(c *fiber.Ctx, err error) error {
+	ctx := c.UserContext()
+	serviceCode := rc.ServiceCodeFor(c.Path())
+
+	var baseResponse dto.BaseResponse
+	if strings.HasPrefix(err.Error(), "strconv.Parse") {
+		err = cerror.NewInfoLevelException().Map(rc.BadRequest(serviceCode))
+	}
+	if errors.Is(err, cerror.ErrTimeout) {
+		err = cerror.NewInfoLevelException().Map(rc.Timeout(serviceCode))
+	}
+
+	var infoLevelException *cerror.InfoLevelException
+	if errors.As(err, &infoLevelException) &&
+		infoLevelException.ResponseMessage != nil &&
+		infoLevelException.ResponseCode != nil &&
+		infoLevelException.HTTPStatusCode != nil {
+		baseResponse.ResponseMessage = *infoLevelException.ResponseMessage
+		baseResponse.ResponseCode = *infoLevelException.ResponseCode
+		return http.SendAny(c.Status(*infoLevelException.HTTPStatusCode), baseResponse)
+	}
+
+	log.
+		Ctx(ctx).
+		Err(err).
+		Msgf("Unhandled Exception Occured")
+
+	mapped := rc.InternalServerError(serviceCode)
+	return http.SendAny(c.Status(mapped.HTTPStatusCode), dto.BaseResponse{
+		ResponseMessage: mapped.ResponseMessage,
+		ResponseCode:    mapped.ResponseCode,
+	})
+}

@@ -1,0 +1,36 @@
+# {{.Name}}
+
+{{.AppName}}.
+
+## Menjalankan
+
+```bash
+go run ./cmd
+```
+
+Konfigurasi ada di `internal/resources/config.yml`; setiap nilai bisa di-override lewat environment variable (`APP_*`).
+
+## Struktur
+
+```
+cmd/                  entrypoint
+appservice/           wiring fx semua module
+external/             client ke partner / gateway (satu package per partner)
+internal/appconfig/   config spesifik aplikasi (key app.*)
+internal/di/          provider umum: base config, validator, resty client
+internal/router/      route per feature + exception handler + request filter
+internal/controller/  parsing & validasi request
+internal/usecase/     business logic
+internal/repository/  akses database
+internal/model/       dto, rc (response code), cerror
+pkg/http/             helper response
+```
+
+Dibuat dengan `svcgen`. Tambah feature / partner baru:
+
+```bash
+svcgen add feature <feature> --action <action> [--method POST] [--public]
+svcgen add external <partner>
+```
+
+Jangan hapus komentar `// svcgen:*` dan `# svcgen:*` — itu penanda tempat `svcgen` mendaftarkan kode baru.

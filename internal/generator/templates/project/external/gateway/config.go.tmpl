@@ -1,0 +1,23 @@
+package gateway
+
+import (
+	"time"
+
+	"github.com/rs/zerolog/log"
+	"repo-iconx.air.id/icon-digital-library/common/config"
+)
+
+type Gateway struct {
+	BaseURL      string        `key:"base-url"`
+	PspId        string        `key:"psp-id"`
+	ClientSecret string        `key:"client-secret"`
+	Timeout      time.Duration `key:"timeout"`
+}
+
+func provideConfig() *Gateway {
+	cfg, err := config.LoadConfigWithKey[*Gateway]("app.external.gateway")
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to load config app.external.gateway")
+	}
+	return cfg
+}

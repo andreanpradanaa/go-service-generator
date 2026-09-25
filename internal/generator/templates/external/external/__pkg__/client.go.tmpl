@@ -1,0 +1,115 @@
+package {{.Name.Lower}}
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"{{.Module}}/internal/model/cerror"
+	"net"
+	"net/http"
+
+	"resty.dev/v3"
+)
+
+type Client struct {
+	http   *resty.Client
+	config *{{.Name.Pascal}}
+}
+
+func NewClient(
+	http *resty.Client,
+	config *{{.Name.Pascal}},
+) *Client {
+	return &Client{
+		http:   http,
+		config: config,
+	}
+}
+
+func (c *Client) request(ctx context.Context, req any, result any, headers map[string]string) *resty.Request {
+	return c.http.R().
+		SetTimeout(c.config.Timeout).
+		SetContext(ctx).
+		SetBody(req).
+		SetResult(result).
+		SetError(result).
+		SetHeaders(headers)
+}
+
+type classifiable interface {
+	Code() string
+	Message() string
+	SetStatus(string)
+	Apply(code, message, status string)
+}
+
+func isTimeout(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
+type doRequest struct {
+	op      string // human readable operation name, used in errors
+	method  string
+	path    string
+	req     any
+	result  classifiable
+	headers map[string]string
+}
+
+// do sends a request to {{.Name.Title}} and classifies the result into
+// SUCCESS / PENDING / FAILED. A timeout is wrapped with cerror.ErrTimeout so
+// the exception handler answers with a Timeout response code.
+func (c *Client) do(ctx context.Context, dr doRequest) error {
+	// TODO: add {{.Name.Title}} auth / signature headers here.
+	r := c.request(ctx, dr.req, dr.result, dr.headers)
+
+	var (
+		resp *resty.Response
+		err  error
+	)
+	switch dr.method {
+	case http.MethodGet:
+		resp, err = r.Get(dr.path)
+	case http.MethodPost:
+		resp, err = r.Post(dr.path)
+	default:
+		return fmt.Errorf("{{.Name.Kebab}} %s: unsupported HTTP method %s", dr.op, dr.method)
+	}
+
+	if err != nil {
+		rc := GeneralError
+		if isTimeout(err) {
+			rc = Timeout
+			err = fmt.Errorf("%w: %w", cerror.ErrTimeout, err)
+		}
+		dr.result.Apply(rc.Code, rc.Message, rc.Status)
+		return err
+	}
+
+	dr.result.SetStatus(StatusOf(dr.result.Code()))
+
+	if resp.IsError() {
+		return fmt.Errorf("{{.Name.Kebab}} %s failed: %s %s", dr.op, dr.result.Code(), dr.result.Message())
+	}
+
+	return nil
+}
+
+// Example endpoint — replace with the real {{.Name.Title}} API:
+//
+//	const pathInquiry = "/v1.0/inquiry"
+//
+//	func (c *Client) Inquiry(ctx context.Context, req *InquiryRequest) (*InquiryResponse, error) {
+//		var result InquiryResponse
+//		return &result, c.do(ctx, doRequest{
+//			op:     "inquiry",
+//			method: http.MethodPost,
+//			path:   pathInquiry,
+//			req:    req,
+//			result: &result,
+//		})
+//	}

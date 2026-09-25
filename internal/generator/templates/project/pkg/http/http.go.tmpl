@@ -1,0 +1,54 @@
+package http
+
+import (
+	"{{.Module}}/internal/model/dto"
+
+	"reflect"
+
+	"github.com/goccy/go-json"
+	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
+	reflectutil "repo-iconx.air.id/icon-digital-library/common/reflect"
+)
+
+func OK(c *fiber.Ctx, data any) error {
+	return OKAll(c, "00", "Success", data)
+}
+
+func OKMsg(c *fiber.Ctx, message string) error {
+	return OKAll(c, "00", message, nil)
+}
+
+func OKAll(c *fiber.Ctx, code, message string, data any) error {
+	baseResponse := dto.BaseResponse{
+		ResponseCode:    code,
+		ResponseMessage: message,
+	}
+
+	val := reflect.ValueOf(data)
+	for val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+
+	if val.Kind() == reflect.Slice || val.Kind() == reflect.Array {
+		response := reflectutil.MergeStructsToMap(baseResponse)
+		response.Set("data", data)
+		return SendAny(c, response)
+	}
+
+	response := reflectutil.MergeStructsToMap(data, baseResponse)
+	return SendAny(c, response)
+}
+
+func SendAny(c *fiber.Ctx, response any) error {
+	data, err := json.Marshal(response)
+	if err != nil {
+		log.Err(err).Msg("error marshaling response")
+		return err
+	}
+	return SendBytes(c, data)
+}
+
+func SendBytes(c *fiber.Ctx, data []byte) error {
+	return c.Send(data)
+}

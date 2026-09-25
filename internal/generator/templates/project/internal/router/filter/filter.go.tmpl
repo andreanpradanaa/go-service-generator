@@ -1,0 +1,14 @@
+package filter
+
+import "go.uber.org/fx"
+
+{{if .WithGateway -}}
+var Module = fx.Provide(
+	fx.Annotate(newRequestFilter, fx.ResultTags(`group:"route-filters"`)),
+)
+{{- else -}}
+var Module = fx.Provide(
+// Register filters here, e.g.
+// fx.Annotate(newRequestFilter, fx.ResultTags(`group:"route-filters"`)),
+)
+{{- end}}

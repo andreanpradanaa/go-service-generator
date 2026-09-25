@@ -1,0 +1,53 @@
+# ============================
+# Stage 1: Build backend (Go)
+# ============================
+FROM golang:1.26-alpine AS backend
+
+RUN mkdir -p /src || true
+WORKDIR /src
+
+ARG APP_COMMIT_ID
+ARG CI_JOB_TOKEN
+
+RUN apk update && apk upgrade
+RUN apk add --no-cache git \
+    && git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@repo-iconx.air.id".insteadOf "https://repo-iconx.air.id" \
+    && export GOPRIVATE="repo-iconx.air.id"
+RUN go env -w GOPRIVATE=repo-iconx.air.id
+
+
+COPY go.mod go.mod
+
+RUN echo "Checking directory structure:" && pwd && ls -R
+
+
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build \
+    -ldflags="-X 'main.AppCommitId=${APP_COMMIT_ID}'" \
+    -o ./main \
+    cmd/main.go
+
+# ============================
+# Stage 2: Final runtime
+# ============================
+FROM alpine:3.20
+
+RUN apk update && apk upgrade
+RUN apk add --no-cache dumb-init tzdata \
+    && cp /usr/share/zoneinfo/Asia/Jakarta /etc/localtime \
+    && echo "Asia/Jakarta" > /etc/timezone
+
+RUN mkdir -p /app || true
+WORKDIR /app
+
+COPY --from=backend /src/main ./main
+
+EXPOSE {{.Port}}
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+
+CMD ["./main"]

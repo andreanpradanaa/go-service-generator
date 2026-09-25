@@ -1,0 +1,66 @@
+package appservice
+
+import (
+	"context"
+	"{{.Module}}/external"
+	"{{.Module}}/internal/appconfig"
+	"{{.Module}}/internal/controller"
+	"{{.Module}}/internal/di"
+	"{{.Module}}/internal/repository"
+	"{{.Module}}/internal/router"
+	"{{.Module}}/internal/usecase"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
+	"go.uber.org/fx"
+	"repo-iconx.air.id/icon-digital-library/common/app"
+	"repo-iconx.air.id/icon-digital-library/common/config"
+	"repo-iconx.air.id/icon-digital-library/common/logger"
+	"repo-iconx.air.id/icon-digital-library/common/validator"
+)
+
+var ServiceModule = fx.Options(
+	logger.WithFxLogger(),
+	app.AppModule,
+	validator.Module,
+	appconfig.Module,
+	di.Module,
+	router.Module,
+	controller.Module,
+	usecase.Module,
+	repository.Module,
+	external.Module,
+	fx.Provide(newAppService),
+)
+
+type AppService struct {
+	baseConfig *config.BaseConfig
+	fiberApp   *fiber.App
+	startTime  time.Time
+}
+
+func newAppService(
+	lifecycle fx.Lifecycle,
+	baseConfig *config.BaseConfig,
+	fiberApp *fiber.App,
+	startTime time.Time,
+) *AppService {
+	appService := AppService{
+		baseConfig: baseConfig,
+		fiberApp:   fiberApp,
+		startTime:  startTime,
+	}
+
+	lifecycle.Append(fx.StartHook(appService.OnStart))
+	return &appService
+}
+
+func (r *AppService) OnStart(ctx context.Context) error {
+	log.
+		Info().
+		Str("version", r.baseConfig.CommitId).
+		Str("servletPath", r.baseConfig.Server.Fiber.ServletPath).
+		Msgf("Service started in %s", time.Since(r.startTime))
+	return nil
+}

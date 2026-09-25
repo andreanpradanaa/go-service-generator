@@ -1,0 +1,44 @@
+# Binaries
+/main
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+
+# Go test & coverage output
+*.out
+coverage.*
+*.coverprofile
+
+# Go workspace
+go.work
+go.work.sum
+
+# Environment & secrets (partner keys, client secret)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Vendor documents (partner integration PDFs)
+*.pdf
+
+# Local knowledge graph (graphify)
+graphify-out/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local tooling
+.scannerwork/
+tmp/

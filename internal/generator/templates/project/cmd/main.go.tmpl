@@ -1,0 +1,32 @@
+package main
+
+import (
+	"{{.Module}}/appservice"
+	"os"
+	"time"
+
+	"go.uber.org/fx"
+)
+
+var AppCommitId = "none"
+
+func main() {
+	if AppCommitId != "none" {
+		_ = os.Setenv("APP_COMMIT_ID", AppCommitId)
+	}
+
+	startTime := time.Now()
+
+	fx.New(
+		fx.Provide(func() time.Time { return startTime }),
+		appservice.ServiceModule,
+		fx.Invoke(run),
+		fx.NopLogger,
+	).Run()
+}
+
+func run(
+	service *appservice.AppService,
+) {
+
+}

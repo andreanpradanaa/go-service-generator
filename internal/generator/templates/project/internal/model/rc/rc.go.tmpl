@@ -1,0 +1,198 @@
+// Package rc maps responses from partners and the gateway to this service's
+// own outward response code and message, per the SNAP response code table.
+package rc
+
+import (
+	"strconv"
+	"strings"
+)
+
+// Response is this service's own outward response envelope. ResponseCode is
+// the full 7-digit code: HTTPStatusCode(3) + service code(2) + case code(2).
+type Response struct {
+	ResponseMessage string
+	HTTPStatusCode  int
+	ResponseCode    string
+}
+
+// Service codes identify which of this service's own endpoints produced a
+// response. They occupy digits 4-5 of ResponseCode. `svcgen add feature`
+// appends new codes above the marker below.
+const (
+	// svcgen:service-codes
+)
+
+// serviceCodeByPath maps every route this service exposes to its service code.
+var serviceCodeByPath = map[string]string{
+	// svcgen:service-paths
+}
+
+// ServiceCodeFor returns the service code for a request path. Every route
+// this service exposes is in serviceCodeByPath; "00" is a defensive fallback
+// for a path that isn't (there shouldn't be one).
+func ServiceCodeFor(path string) string {
+	if code, ok := serviceCodeByPath[path]; ok {
+		return code
+	}
+	return "00"
+}
+
+// rcKey identifies one row of the SNAP response code table: HTTP status + case code. Service code is
+// always "any" in the table, so it's not part of the key.
+type rcKey struct {
+	httpCode int
+	caseCode string
+}
+
+// messages is the SNAP response code table: every (HTTP code, case code) pair this
+// service can return, and the message for it.
+var messages = map[rcKey]string{
+	{200, "00"}: "Successful",
+	{202, "00"}: "Request In Progress",
+
+	{400, "00"}: "Bad Request",
+	{400, "01"}: "Invalid Field Format {field name}",
+	{400, "02"}: "Invalid Mandatory Field {field name}",
+
+	{401, "00"}: "Unauthorized. [reason]",
+	{401, "01"}: "Invalid Token (B2B)",
+	{401, "02"}: "Invalid Customer Token",
+	{401, "03"}: "Token Not Found (B2B)",
+	{401, "04"}: "Customer Token Not Found",
+
+	{403, "00"}: "Transaction Expired",
+	{403, "01"}: "Feature Not Allowed [Reason]",
+	{403, "02"}: "Exceeds Transaction Amount Limit",
+	{403, "03"}: "Suspected Fraud",
+	{403, "04"}: "Activity Count Limit Exceeded",
+	{403, "05"}: "Do Not Honor",
+	{403, "06"}: "Feature Not Allowed At This Time. [reason]",
+	{403, "07"}: "Card Blocked",
+	{403, "08"}: "Card Expired",
+	{403, "09"}: "Dormant Account",
+	{403, "10"}: "Need To Set Token Limit",
+	{403, "11"}: "OTP Blocked",
+	{403, "12"}: "OTP Lifetime Expired",
+	{403, "13"}: "OTP Sent To Cardholder",
+	{403, "14"}: "Insufficient Funds",
+	{403, "15"}: "Transaction Not Permitted.[reason]",
+	{403, "16"}: "Suspend Transaction",
+	{403, "17"}: "Token Limit Exceeded",
+	{403, "18"}: "Inactive Card/Account/Customer",
+	{403, "19"}: "Merchant Blacklisted",
+	{403, "20"}: "Merchant Limit Exceed",
+	{403, "21"}: "Set Limit Not Allowed",
+	{403, "22"}: "Token Limit Invalid",
+	{403, "23"}: "Account Limit Exceed",
+
+	{404, "00"}: "Invalid Transaction Status",
+	{404, "01"}: "Transaction Not Found",
+	{404, "02"}: "Invalid Routing",
+	{404, "03"}: "Bank Not Supported By Switch",
+	{404, "04"}: "Transaction Cancelled",
+	{404, "05"}: "Merchant Is Not Registered For Card Registration Services",
+	{404, "06"}: "Need To Request OTP",
+	{404, "07"}: "Journey Not Found",
+	{404, "08"}: "Invalid Merchant",
+	{404, "09"}: "No Issuer",
+	{404, "10"}: "Invalid API Transition",
+	{404, "11"}: "Invalid Card/Account/Customer [info]/Virtual Account",
+	{404, "12"}: "Invalid Bill/Virtual Account [Reason]",
+	{404, "13"}: "Invalid Amount",
+	{404, "14"}: "Paid Bill",
+	{404, "15"}: "Invalid OTP",
+	{404, "16"}: "Partner Not Found",
+	{404, "17"}: "Invalid Terminal",
+	{404, "18"}: "Inconsistent Request",
+	{404, "19"}: "Invalid Bill/Virtual Account",
+
+	{405, "00"}: "Requested Function Is Not Supported",
+	{405, "01"}: "Requested Operation Is Not Allowed",
+
+	{409, "00"}: "Conflict",
+	{409, "01"}: "Duplicate partnerReferenceNo",
+
+	{429, "00"}: "Too Many Requests",
+
+	{500, "00"}: "General Error",
+	{500, "01"}: "Internal Server Error",
+	{500, "02"}: "External Server Error",
+
+	{504, "00"}: "Timeout",
+}
+
+// at looks up a table row by HTTP code and case code, and assembles the full
+// 7-digit ResponseCode for the given service.
+func at(httpCode int, serviceCode, caseCode string) Response {
+	return Response{
+		ResponseMessage: messages[rcKey{httpCode, caseCode}],
+		HTTPStatusCode:  httpCode,
+		ResponseCode:    strconv.Itoa(httpCode) + serviceCode + caseCode,
+	}
+}
+
+// atf is at, with a placeholder (e.g. "{field name}", "[reason]") filled in.
+func atf(httpCode int, serviceCode, caseCode, placeholder, value string) Response {
+	r := at(httpCode, serviceCode, caseCode)
+	r.ResponseMessage = strings.Replace(r.ResponseMessage, placeholder, value, 1)
+	return r
+}
+
+// Responses for errors this service detects itself, before ever calling a
+// partner or the gateway. serviceCode identifies which endpoint is responding — use
+// ServiceCodeFor(c.Path()) or one of the Service* constants.
+func Successful(serviceCode string) Response          { return at(200, serviceCode, "00") }
+func BadRequest(serviceCode string) Response          { return at(400, serviceCode, "00") }
+func InternalServerError(serviceCode string) Response { return at(500, serviceCode, "01") }
+func Timeout(serviceCode string) Response             { return at(504, serviceCode, "00") }
+
+func ClientNotFound(serviceCode string) Response {
+	return atf(401, serviceCode, "00", "[reason]", "Unknown Client")
+}
+
+func MissingHeaderTimestamp(serviceCode string) Response {
+	return atf(400, serviceCode, "02", "{field name}", "timestamp")
+}
+
+func MissingHeaderPspId(serviceCode string) Response {
+	return atf(400, serviceCode, "02", "{field name}", "psp-id")
+}
+
+func MissingHeaderSignature(serviceCode string) Response {
+	return atf(400, serviceCode, "02", "{field name}", "signature")
+}
+
+func InvalidHeaderTimestamp(serviceCode string) Response {
+	return atf(400, serviceCode, "01", "{field name}", "timestamp")
+}
+
+func InvalidHeaderSignature(serviceCode string) Response {
+	return atf(400, serviceCode, "01", "{field name}", "signature")
+}
+
+func InvalidFieldFormat(serviceCode, fieldName string) Response {
+	return atf(400, serviceCode, "01", "{field name}", fieldName)
+}
+
+// FromCode maps a wire response code (3-digit HTTP code + 2-digit service
+// code + 2-digit case code — the SNAP shape partners and the gateway return)
+// to this service's own Response. Unknown or malformed codes fall back to
+// InternalServerError. serviceCode is this service's own endpoint, not the
+// one parsed out of the wire code.
+func FromCode(serviceCode, code string) Response {
+	if len(code) != 7 {
+		return InternalServerError(serviceCode)
+	}
+
+	httpCode, err := strconv.Atoi(code[:3])
+	if err != nil {
+		return InternalServerError(serviceCode)
+	}
+
+	caseCode := code[5:7]
+	if _, ok := messages[rcKey{httpCode, caseCode}]; !ok {
+		return InternalServerError(serviceCode)
+	}
+
+	return at(httpCode, serviceCode, caseCode)
+}
