@@ -45,26 +45,31 @@ svcgen new iconpay-dana-integrator --port 6002
 | `--out` | `.` | parent directory |
 | `--manifest` | `iconpay/<name>` | path di `k8s-manifest-ni` untuk job deploy CI |
 | `--port` | `6001` | port HTTP |
-| `--gateway` | `false` *(ditanya)* | client `external/gateway` + request filter `psp-id`/`timestamp`/`signature` |
-| `--postgres` / `--redis` | `true` | nilai default `enable` data source di config |
-| `--external` | kosong *(ditanya)* | package external partner, pisahkan dengan koma (`dana,ovo`) |
 | `--example` | `false` | contoh feature `POST /api/v1/example/ping` |
 | `--tidy` | `true` | jalankan `go mod tidy` |
 | `--git` | `true` | `git init` dengan branch `development` |
 
-Secara default service **tidak terhubung ke pihak ketiga**: tidak ada folder `external/`, gateway, maupun request filter.
-Kalau `--gateway` dan `--external` tidak diisi, svcgen bertanya dulu:
+`svcgen new` selalu menanyakan koneksi yang dipakai service. Semuanya opsional, default **tidak** (Enter = `N`):
 
 ```
+Gunakan PostgreSQL? (y/N): y
+Gunakan Redis? (y/N):
 Buat package external (koneksi ke pihak ketiga)? (y/N): y
 Sertakan gateway iconpay (client + request filter psp-id/signature)? (y/N): y
 Nama partner (pisahkan dengan koma, kosongkan jika tidak ada): dana
 ```
 
-- Jawab `N` / Enter di pertanyaan pertama → tanpa external sama sekali.
-- Tanpa pertanyaan (script/CI): isi flag-nya, misalnya `--gateway --external dana,ovo`, atau `--external=""` untuk tanpa external.
-- Pertanyaan juga dilewati kalau stdin bukan terminal; hasilnya tanpa external.
-- External tetap bisa ditambah nanti dengan `svcgen add external`.
+| Pertanyaan | Kalau `y` | Kalau `N` |
+|---|---|---|
+| PostgreSQL / Redis | `enable: true` di `config.yml`; library `common` membuka koneksi saat start dan service berhenti kalau gagal konek | `enable: false`, service jalan tanpa database |
+| Package external | lanjut ke pertanyaan gateway dan partner | tidak ada folder `external/`, gateway, maupun request filter |
+
+Data source tetap bisa dinyalakan nanti lewat env (`APP_DATA_SOURCE_POSTGRES_ENABLE=true`), dan external ditambah dengan `svcgen add external`.
+Untuk script/CI, jawaban bisa di-pipe, satu per baris:
+
+```bash
+printf 'y\nn\ny\ny\ndana\n' | svcgen new my-svc
+```
 
 Setiap service punya `GET /healthz` (di `internal/router/health_router.go`) untuk probe Kubernetes:
 
