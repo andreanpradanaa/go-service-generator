@@ -5,12 +5,28 @@ fx + fiber + `repo-iconx.air.id/icon-digital-library/common`, lengkap dengan Doc
 
 ## Install
 
-Repo ini private, jadi Go perlu tahu module-nya private:
-
 ```bash
 go env -w GOPRIVATE='repo-iconx.air.id/*,github.com/andreanpradanaa/*'
 go install github.com/andreanpradanaa/go-service-generator/cmd/svcgen@latest
 ```
+
+- `repo-iconx.air.id/*` dibutuhkan oleh service hasil generate (dependency `icon-digital-library/common`), bukan oleh svcgen.
+- `github.com/andreanpradanaa/*` hanya perlu kalau repo ini private.
+- `go env -w GOPRIVATE=...` menimpa nilai lama, jadi tulis semua pola sekaligus.
+
+`go install` menaruh binary di `$(go env GOPATH)/bin` (biasanya `~/go/bin`). Kalau muncul `command not found: svcgen`, tambahkan folder itu ke PATH (sekali saja):
+
+```bash
+# zsh (default macOS)
+echo 'export PATH="$(go env GOPATH)/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+
+# bash
+echo 'export PATH="$(go env GOPATH)/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Cek dengan `svcgen version`.
 
 Atau dari source: `go build -o svcgen ./cmd/svcgen`.
 
