@@ -45,22 +45,26 @@ svcgen new iconpay-dana-integrator --port 6002
 | `--out` | `.` | parent directory |
 | `--manifest` | `iconpay/<name>` | path di `k8s-manifest-ni` untuk job deploy CI |
 | `--port` | `6001` | port HTTP |
-| `--gateway` | `true` | client `external/gateway` + request filter `psp-id`/`timestamp`/`signature` |
+| `--gateway` | `false` *(ditanya)* | client `external/gateway` + request filter `psp-id`/`timestamp`/`signature` |
 | `--postgres` / `--redis` | `true` | nilai default `enable` data source di config |
-| `--external` | *(ditanya)* | package external partner, pisahkan dengan koma (`dana,ovo`). Kalau tidak diisi, svcgen bertanya dulu; `--external=""` = tanpa external |
+| `--external` | kosong *(ditanya)* | package external partner, pisahkan dengan koma (`dana,ovo`) |
 | `--example` | `false` | contoh feature `POST /api/v1/example/ping` |
 | `--tidy` | `true` | jalankan `go mod tidy` |
 | `--git` | `true` | `git init` dengan branch `development` |
 
-Kalau `--external` tidak diisi, svcgen bertanya dulu:
+Secara default service **tidak terhubung ke pihak ketiga**: tidak ada folder `external/`, gateway, maupun request filter.
+Kalau `--gateway` dan `--external` tidak diisi, svcgen bertanya dulu:
 
 ```
-Buat package external untuk partner? (y/N): y
-Nama partner (pisahkan dengan koma, contoh: dana,ovo): dana
+Buat package external (koneksi ke pihak ketiga)? (y/N): y
+Sertakan gateway iconpay (client + request filter psp-id/signature)? (y/N): y
+Nama partner (pisahkan dengan koma, kosongkan jika tidak ada): dana
 ```
 
-Jawab `N` (atau Enter) untuk melewati; package external tetap bisa ditambah nanti dengan `svcgen add external`.
-Pertanyaan ini dilewati kalau stdin bukan terminal (misalnya di script/CI).
+- Jawab `N` / Enter di pertanyaan pertama → tanpa external sama sekali.
+- Tanpa pertanyaan (script/CI): isi flag-nya, misalnya `--gateway --external dana,ovo`, atau `--external=""` untuk tanpa external.
+- Pertanyaan juga dilewati kalau stdin bukan terminal; hasilnya tanpa external.
+- External tetap bisa ditambah nanti dengan `svcgen add external`.
 
 ### Tambah partner (external client)
 
@@ -69,7 +73,7 @@ cd iconpay-dana-integrator
 svcgen add external dana
 ```
 
-Membuat `external/dana/` (config, http client, `Client.do` dengan klasifikasi SUCCESS/PENDING/FAILED dan timeout → `cerror.ErrTimeout`), mendaftarkan `dana.Module` di `external/external.go`, dan menambah `app.external.dana` di `config.yml`.
+Kalau belum ada folder `external/`, svcgen membuatnya dan mendaftarkan `external.Module` di `appservice`. Lalu membuat `external/dana/` (config, http client, `Client.do` dengan klasifikasi SUCCESS/PENDING/FAILED dan timeout → `cerror.ErrTimeout`), mendaftarkan `dana.Module` di `external/external.go`, dan menambah `app.external.dana` di `config.yml`.
 
 ### Tambah feature / endpoint
 

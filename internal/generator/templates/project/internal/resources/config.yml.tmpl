@@ -27,6 +27,7 @@ app:
       enable: ${ APP_SERVER_GRPC_ENABLE | false }
   logger:
     level: ${ APP_LOGGER_LEVEL | debug }
+{{- if .HasExternal}}
   external:
 {{- if .WithGateway}}
     gateway:
@@ -36,3 +37,5 @@ app:
       timeout: ${ APP_EXTERNAL_GATEWAY_TIMEOUT | 30s }
 {{- end}}
     # svcgen:external
+{{- end}}
+  # svcgen:app

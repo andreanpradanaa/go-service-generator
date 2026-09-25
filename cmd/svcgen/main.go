@@ -91,12 +91,12 @@ func cmdNew(args []string) error {
 	fs.StringVar(&opts.OutputDir, "out", ".", "parent directory tempat repo dibuat")
 	fs.StringVar(&opts.Manifest, "manifest", "", "path k8s-manifest-ni untuk CI (default: iconpay/<name>)")
 	fs.IntVar(&opts.Port, "port", 6001, "port HTTP service")
-	fs.BoolVar(&opts.WithGateway, "gateway", true, "sertakan client gateway + request filter psp-id/signature")
+	fs.BoolVar(&opts.WithGateway, "gateway", false, "sertakan client gateway iconpay + request filter psp-id/signature; kalau --gateway/--external tidak diisi akan ditanya")
 	fs.BoolVar(&opts.Postgres, "postgres", true, "aktifkan data source postgres di config")
 	fs.BoolVar(&opts.Redis, "redis", true, "aktifkan data source redis di config")
 	fs.BoolVar(&opts.Example, "example", false, "buat contoh feature (POST /api/v1/example/ping)")
 	var externals string
-	fs.StringVar(&externals, "external", "", "package external yang dibuat, pisahkan dengan koma (contoh: dana,ovo); kalau tidak diisi akan ditanya")
+	fs.StringVar(&externals, "external", "", "package external partner, pisahkan dengan koma (contoh: dana,ovo); kalau --gateway/--external tidak diisi akan ditanya")
 	fs.BoolVar(&opts.Tidy, "tidy", true, "jalankan go mod tidy setelah generate")
 	fs.BoolVar(&opts.GitInit, "git", true, "git init dengan branch development")
 
@@ -106,13 +106,13 @@ func cmdNew(args []string) error {
 	}
 	opts.Name = name
 
-	externalSet := false
-	fs.Visit(func(f *flag.Flag) { externalSet = externalSet || f.Name == "external" })
-	switch {
-	case externalSet:
-		opts.Externals = splitList(externals)
-	case isTerminal(os.Stdin):
-		opts.Externals = askExternals()
+	// External connections are opt-in: flags win, otherwise ask (only on a
+	// terminal), otherwise generate none.
+	flagSet := false
+	fs.Visit(func(f *flag.Flag) { flagSet = flagSet || f.Name == "external" || f.Name == "gateway" })
+	opts.Externals = splitList(externals)
+	if !flagSet && isTerminal(os.Stdin) {
+		opts.WithGateway, opts.Externals = askExternals()
 	}
 
 	dir, err := generator.New(opts)
@@ -184,29 +184,30 @@ func cmdAddExternal(args []string) error {
 	return err
 }
 
-// askExternals asks whether to create external partner packages right away.
-// Without an answer (EOF) no package is created.
-func askExternals() []string {
+// askExternals asks whether the service connects to third parties at all,
+// and if so whether it uses the iconpay gateway and which partners. Any
+// answer other than yes (including EOF) means no.
+func askExternals() (gateway bool, partners []string) {
 	in := bufio.NewReader(os.Stdin)
 	ask := func(q string) string {
 		fmt.Print(q)
 		line, _ := in.ReadString('\n')
 		return strings.TrimSpace(line)
 	}
-
-	switch strings.ToLower(ask("Buat package external untuk partner? (y/N): ")) {
-	case "y", "ya", "yes":
-	default:
-		return nil
-	}
-
-	for {
-		names := splitList(ask("Nama partner (pisahkan dengan koma, contoh: dana,ovo): "))
-		if len(names) > 0 {
-			return names
+	yes := func(answer string) bool {
+		switch strings.ToLower(answer) {
+		case "y", "ya", "yes":
+			return true
 		}
-		fmt.Println("Nama partner tidak boleh kosong.")
+		return false
 	}
+
+	if !yes(ask("Buat package external (koneksi ke pihak ketiga)? (y/N): ")) {
+		return false, nil
+	}
+	gateway = yes(ask("Sertakan gateway iconpay (client + request filter psp-id/signature)? (y/N): "))
+	partners = splitList(ask("Nama partner (pisahkan dengan koma, kosongkan jika tidak ada): "))
+	return gateway, partners
 }
 
 func splitList(s string) []string {

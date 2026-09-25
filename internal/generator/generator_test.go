@@ -70,3 +70,38 @@ func TestGenerate(t *testing.T) {
 		}
 	}
 }
+
+// TestGenerateWithoutExternal checks that a service without third-party
+// connections has no external/ package, and that add external creates and
+// wires it afterwards.
+func TestGenerateWithoutExternal(t *testing.T) {
+	dir, err := New(NewOptions{Name: "plain-svc", OutputDir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{"external", "internal/router/filter/request_filter.go"} {
+		if _, err := os.Stat(filepath.Join(dir, p)); !os.IsNotExist(err) {
+			t.Errorf("%s should not exist without external connections", p)
+		}
+	}
+
+	if _, err := AddExternal(ExternalOptions{Dir: dir, Name: "dana"}); err != nil {
+		t.Fatal(err)
+	}
+	expect := map[string][]string{
+		"appservice/appservice.go":      {`"plain-svc/external"`, "external.Module,"},
+		"external/external.go":          {`"plain-svc/external/dana"`, "dana.Module,"},
+		"internal/resources/config.yml": {"  external:\n    dana:\n"},
+	}
+	for file, wants := range expect {
+		raw, err := os.ReadFile(filepath.Join(dir, file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range wants {
+			if !strings.Contains(string(raw), want) {
+				t.Errorf("%s: missing %q\n%s", file, want, raw)
+			}
+		}
+	}
+}

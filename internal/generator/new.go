@@ -33,6 +33,7 @@ type projectData struct {
 	RedisPrefix string
 	Port        int
 	WithGateway bool
+	HasExternal bool // external/ is generated: gateway or at least one partner
 	Postgres    bool
 	Redis       bool
 }
@@ -51,6 +52,7 @@ func New(opts NewOptions) (string, error) {
 		RedisPrefix: name.Snake + ":",
 		Port:        opts.Port,
 		WithGateway: opts.WithGateway,
+		HasExternal: opts.WithGateway || len(opts.Externals) > 0,
 		Postgres:    opts.Postgres,
 		Redis:       opts.Redis,
 	}
@@ -75,6 +77,9 @@ func New(opts NewOptions) (string, error) {
 	}
 
 	keep := func(rel string) bool {
+		if !data.HasExternal && strings.HasPrefix(rel, "external/") {
+			return false
+		}
 		if !opts.WithGateway && (strings.HasPrefix(rel, "external/gateway/") || rel == "internal/router/filter/request_filter.go") {
 			return false
 		}

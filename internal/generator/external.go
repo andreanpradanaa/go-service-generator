@@ -1,7 +1,9 @@
 package generator
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -26,6 +28,10 @@ func AddExternal(opts ExternalOptions) ([]string, error) {
 		return nil, err
 	}
 	data := externalData{Module: module, Name: name}
+
+	if err := ensureExternalRoot(opts.Dir, module); err != nil {
+		return nil, err
+	}
 
 	target := func(rel string) string {
 		rel = strings.ReplaceAll(rel, "__pkg__", name.Lower)
@@ -54,4 +60,35 @@ func AddExternal(opts ExternalOptions) ([]string, error) {
 		"  timeout: "+fmt.Sprintf(env, "TIMEOUT", "30s"),
 	)
 	return written, err
+}
+
+// ensureExternalRoot creates external/external.go, registers external.Module
+// in appservice and adds app.external to config.yml, for services generated
+// without any external package.
+func ensureExternalRoot(dir, module string) error {
+	externalGo := filepath.Join(dir, "external", "external.go")
+	if _, err := os.Stat(externalGo); err == nil {
+		return nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	content, err := render("templates/project/external/external.go.tmpl", projectData{Module: module})
+	if err != nil {
+		return err
+	}
+	if err := writeNewFile(externalGo, content); err != nil {
+		return err
+	}
+
+	appservice := filepath.Join(dir, "appservice", "appservice.go")
+	if err := insertBeforeMarker(appservice, "// svcgen:imports", fmt.Sprintf("%q", module+"/external")); err != nil {
+		return err
+	}
+	if err := insertBeforeMarker(appservice, "// svcgen:modules", "external.Module,"); err != nil {
+		return err
+	}
+
+	configYml := filepath.Join(dir, "internal", "resources", "config.yml")
+	return insertBeforeMarker(configYml, "# svcgen:app", "external:", "  # svcgen:external")
 }

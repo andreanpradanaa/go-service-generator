@@ -2,7 +2,9 @@ package appservice
 
 import (
 	"context"
+{{- if .HasExternal}}
 	"{{.Module}}/external"
+{{- end}}
 	"{{.Module}}/internal/appconfig"
 	"{{.Module}}/internal/controller"
 	"{{.Module}}/internal/di"
@@ -10,6 +12,7 @@ import (
 	"{{.Module}}/internal/router"
 	"{{.Module}}/internal/usecase"
 	"time"
+	// svcgen:imports
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
@@ -30,7 +33,10 @@ var ServiceModule = fx.Options(
 	controller.Module,
 	usecase.Module,
 	repository.Module,
+{{- if .HasExternal}}
 	external.Module,
+{{- end}}
+	// svcgen:modules
 	fx.Provide(newAppService),
 )
 
