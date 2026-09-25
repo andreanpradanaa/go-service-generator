@@ -94,60 +94,6 @@ func writeNewFile(out string, content []byte) error {
 	return os.WriteFile(out, content, 0o644)
 }
 
-// insertBeforeMarker inserts lines just above the line containing marker,
-// using the marker line's indentation. If the first line is already present
-// the insertion is skipped, so re-running a generator does not duplicate
-// registrations. Go files are gofmt-ed afterwards.
-func insertBeforeMarker(file, marker string, lines ...string) error {
-	raw, err := os.ReadFile(file)
-	if err != nil {
-		return err
-	}
-	content := string(raw)
-
-	idx := strings.Index(content, marker)
-	if idx < 0 {
-		return fmt.Errorf("marker %q not found in %s — was it removed?", marker, file)
-	}
-	lineStart := strings.LastIndex(content[:idx], "\n") + 1
-	indent := content[lineStart:idx]
-	if strings.TrimSpace(indent) != "" {
-		return fmt.Errorf("marker %q in %s must be on its own line", marker, file)
-	}
-
-	isGo := strings.HasSuffix(file, ".go")
-	if isGo && indent == "" {
-		// gofmt pulls a comment that is the only thing inside a call's
-		// parentheses to column 0; indent it back so the entries inserted
-		// above it are formatted as one block.
-		indent = "\t"
-		content = content[:lineStart] + indent + content[lineStart:]
-	}
-
-	if len(lines) == 0 || strings.Contains(content, indent+lines[0]+"\n") {
-		return nil
-	}
-
-	var add strings.Builder
-	for _, l := range lines {
-		if l == "" {
-			add.WriteString("\n")
-			continue
-		}
-		add.WriteString(indent + l + "\n")
-	}
-
-	content = content[:lineStart] + add.String() + content[lineStart:]
-
-	out := []byte(content)
-	if isGo {
-		if out, err = format.Source(out); err != nil {
-			return fmt.Errorf("gofmt %s: %w", file, err)
-		}
-	}
-	return os.WriteFile(file, out, 0o644)
-}
-
 var modulePattern = regexp.MustCompile(`(?m)^module\s+(\S+)`)
 
 // readModule returns the module path of the service in dir, and checks that

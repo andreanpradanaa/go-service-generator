@@ -25,12 +25,3 @@ internal/repository/  akses database
 internal/model/       dto, rc (response code), cerror
 pkg/http/             helper response
 ```
-
-Dibuat dengan `svcgen`. Tambah feature / partner baru:
-
-```bash
-svcgen add feature <feature> --action <action> [--method POST] [--public]
-svcgen add external <partner>
-```
-
-Jangan hapus komentar `// svcgen:*` dan `# svcgen:*` — itu penanda tempat `svcgen` mendaftarkan kode baru.

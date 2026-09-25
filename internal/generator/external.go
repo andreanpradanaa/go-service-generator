@@ -43,28 +43,27 @@ func AddExternal(opts ExternalOptions) ([]string, error) {
 	}
 
 	externalGo := filepath.Join(opts.Dir, "external", "external.go")
-	if err := insertBeforeMarker(externalGo, "// svcgen:imports", fmt.Sprintf("%q", module+"/external/"+name.Lower)); err != nil {
+	if err := addImport(externalGo, module, module+"/external/"+name.Lower); err != nil {
 		return written, err
 	}
-	if err := insertBeforeMarker(externalGo, "// svcgen:modules", name.Lower+".Module,"); err != nil {
+	if err := appendToBlock(externalGo, "var Module = fx.Options(", name.Lower+".Module,"); err != nil {
 		return written, err
 	}
 
 	env := "${ APP_EXTERNAL_" + name.Upper + "_%s | %s }"
 	configYml := filepath.Join(opts.Dir, "internal", "resources", "config.yml")
-	err = insertBeforeMarker(configYml, "# svcgen:external",
-		name.Kebab+":",
-		"  base-url: "+fmt.Sprintf(env, "BASE_URL", "CHANGE_ME"),
-		"  client-id: "+fmt.Sprintf(env, "CLIENT_ID", "CHANGE_ME"),
-		"  client-secret: "+fmt.Sprintf(env, "CLIENT_SECRET", "CHANGE_ME"),
-		"  timeout: "+fmt.Sprintf(env, "TIMEOUT", "30s"),
-	)
+	err = addExternalConfig(configYml, name.Kebab, []string{
+		"base-url: " + fmt.Sprintf(env, "BASE_URL", "CHANGE_ME"),
+		"client-id: " + fmt.Sprintf(env, "CLIENT_ID", "CHANGE_ME"),
+		"client-secret: " + fmt.Sprintf(env, "CLIENT_SECRET", "CHANGE_ME"),
+		"timeout: " + fmt.Sprintf(env, "TIMEOUT", "30s"),
+	})
 	return written, err
 }
 
-// ensureExternalRoot creates external/external.go, registers external.Module
-// in appservice and adds app.external to config.yml, for services generated
-// without any external package.
+// ensureExternalRoot creates external/external.go and registers
+// external.Module in appservice, for services generated without any external
+// package. app.external in config.yml is created by addExternalConfig.
 func ensureExternalRoot(dir, module string) error {
 	externalGo := filepath.Join(dir, "external", "external.go")
 	if _, err := os.Stat(externalGo); err == nil {
@@ -82,13 +81,8 @@ func ensureExternalRoot(dir, module string) error {
 	}
 
 	appservice := filepath.Join(dir, "appservice", "appservice.go")
-	if err := insertBeforeMarker(appservice, "// svcgen:imports", fmt.Sprintf("%q", module+"/external")); err != nil {
+	if err := addImport(appservice, module, module+"/external"); err != nil {
 		return err
 	}
-	if err := insertBeforeMarker(appservice, "// svcgen:modules", "external.Module,"); err != nil {
-		return err
-	}
-
-	configYml := filepath.Join(dir, "internal", "resources", "config.yml")
-	return insertBeforeMarker(configYml, "# svcgen:app", "external:", "  # svcgen:external")
+	return insertInBlock(appservice, "var ServiceModule = fx.Options(", "fx.Provide(newAppService)", "external.Module,")
 }

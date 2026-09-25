@@ -4,7 +4,6 @@ import (
 {{- if .WithGateway}}
 	"{{.Module}}/external/gateway"
 {{- end}}
-	// svcgen:imports
 
 	"go.uber.org/fx"
 )
@@ -13,5 +12,4 @@ var Module = fx.Options(
 {{- if .WithGateway}}
 	gateway.Module,
 {{- end}}
-	// svcgen:modules
 )

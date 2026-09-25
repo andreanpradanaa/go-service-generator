@@ -97,7 +97,9 @@ svcgen add feature transfer-out --method GET --public # GET  /api/v1/transfer-ou
 
 Membuat router, controller, usecase, dan dto, lalu mendaftarkannya ke `fx.Provide` di router/controller/usecase, dan menambah service code berikutnya di `internal/model/rc/rc.go`.
 
-> Komentar `// svcgen:*` dan `# svcgen:*` di repo hasil generate adalah penanda tempat svcgen menyisipkan kode. Jangan dihapus.
+> Repo hasil generate tidak berisi penanda atau jejak svcgen. `svcgen add` menyisipkan kode berdasarkan struktur yang sudah ada, jadi bagian ini jangan di-rename:
+> `var routerModule = fx.Provide(` (router.go), `var Module = fx.Provide(` (controller.go, usecase.go), `const (` dan `var serviceCodeByPath` (rc.go),
+> `var Module = fx.Options(` (external/external.go), `var ServiceModule = fx.Options(` (appservice.go), dan key `  external:` di config.yml.
 
 ## Mengubah template
 

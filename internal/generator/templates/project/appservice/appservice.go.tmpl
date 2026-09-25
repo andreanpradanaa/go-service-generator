@@ -12,7 +12,6 @@ import (
 	"{{.Module}}/internal/router"
 	"{{.Module}}/internal/usecase"
 	"time"
-	// svcgen:imports
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
@@ -36,7 +35,6 @@ var ServiceModule = fx.Options(
 {{- if .HasExternal}}
 	external.Module,
 {{- end}}
-	// svcgen:modules
 	fx.Provide(newAppService),
 )
 

@@ -105,3 +105,35 @@ func TestGenerateWithoutExternal(t *testing.T) {
 		}
 	}
 }
+
+// TestNoGeneratorTraces checks that generated services, including files
+// edited by add feature / add external, never mention the generator.
+func TestNoGeneratorTraces(t *testing.T) {
+	dir, err := New(NewOptions{Name: "trace-svc", OutputDir: t.TempDir(), WithGateway: true, Example: true, Externals: []string{"ovo"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AddFeature(FeatureOptions{Dir: dir, Name: "balance", Action: "account"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AddExternal(ExternalOptions{Dir: dir, Name: "dana"}); err != nil {
+		t.Fatal(err)
+	}
+
+	err = filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		raw, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(strings.ToLower(string(raw)), "svcgen") {
+			t.Errorf("%s mentions svcgen", p)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

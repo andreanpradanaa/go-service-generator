@@ -16,15 +16,12 @@ type Response struct {
 }
 
 // Service codes identify which of this service's own endpoints produced a
-// response. They occupy digits 4-5 of ResponseCode. `svcgen add feature`
-// appends new codes above the marker below.
+// response. They occupy digits 4-5 of ResponseCode.
 const (
-	// svcgen:service-codes
 )
 
 // serviceCodeByPath maps every route this service exposes to its service code.
 var serviceCodeByPath = map[string]string{
-	// svcgen:service-paths
 }
 
 // ServiceCodeFor returns the service code for a request path. Every route

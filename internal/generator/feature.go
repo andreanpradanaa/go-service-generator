@@ -79,23 +79,19 @@ func AddFeature(opts FeatureOptions) ([]string, error) {
 	}
 
 	internal := filepath.Join(opts.Dir, "internal")
-	steps := []struct {
-		file, marker string
-		lines        []string
-	}{
-		{filepath.Join(internal, "router", "router.go"), "// svcgen:routes",
-			[]string{fmt.Sprintf("fx.Annotate(new%sRouter, fx.ResultTags(`group:\"routes\"`)),", feature.Pascal)}},
-		{filepath.Join(internal, "controller", "controller.go"), "// svcgen:controllers",
-			[]string{fmt.Sprintf("new%sController,", feature.Pascal)}},
-		{filepath.Join(internal, "usecase", "usecase.go"), "// svcgen:usecases",
-			[]string{fmt.Sprintf("new%sUsecase,", feature.Pascal)}},
-		{rcFile, "// svcgen:service-codes",
-			[]string{fmt.Sprintf("%s = %q", data.ServiceConst, serviceCode)}},
-		{rcFile, "// svcgen:service-paths",
-			[]string{fmt.Sprintf("%q: %s,", data.GroupPath+data.ActionPath, data.ServiceConst)}},
+	steps := []struct{ file, opener, line string }{
+		{filepath.Join(internal, "router", "router.go"), "var routerModule = fx.Provide(",
+			fmt.Sprintf("fx.Annotate(new%sRouter, fx.ResultTags(`group:\"routes\"`)),", feature.Pascal)},
+		{filepath.Join(internal, "controller", "controller.go"), "var Module = fx.Provide(",
+			fmt.Sprintf("new%sController,", feature.Pascal)},
+		{filepath.Join(internal, "usecase", "usecase.go"), "var Module = fx.Provide(",
+			fmt.Sprintf("new%sUsecase,", feature.Pascal)},
+		{rcFile, "const (", fmt.Sprintf("%s = %q", data.ServiceConst, serviceCode)},
+		{rcFile, "var serviceCodeByPath = map[string]string{",
+			fmt.Sprintf("%q: %s,", data.GroupPath+data.ActionPath, data.ServiceConst)},
 	}
 	for _, s := range steps {
-		if err := insertBeforeMarker(s.file, s.marker, s.lines...); err != nil {
+		if err := appendToBlock(s.file, s.opener, s.line); err != nil {
 			return written, err
 		}
 	}
