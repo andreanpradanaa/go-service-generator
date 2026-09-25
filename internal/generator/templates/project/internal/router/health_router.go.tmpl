@@ -1,0 +1,51 @@
+package router
+
+import (
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+	"repo-iconx.air.id/icon-digital-library/common/config"
+	"repo-iconx.air.id/icon-digital-library/common/sbrest"
+)
+
+// newHealthRouter serves GET /healthz for liveness/readiness probes. It sits
+// outside /api/v1 so request filters scoped to that prefix do not apply, and
+// it only reports that the process is up — it does not ping dependencies.
+func newHealthRouter(
+	app *fiber.App,
+	baseConfig *config.BaseConfig,
+	startTime time.Time,
+) sbrest.Route {
+	return &HealthRouter{
+		app:        app,
+		baseConfig: baseConfig,
+		startTime:  startTime,
+	}
+}
+
+type HealthRouter struct {
+	app        *fiber.App
+	baseConfig *config.BaseConfig
+	startTime  time.Time
+}
+
+type healthResponse struct {
+	Status  string `json:"status"`
+	Version string `json:"version"`
+	Uptime  string `json:"uptime"`
+}
+
+func (r *HealthRouter) Public() {
+	r.app.Get("/healthz", r.healthz)
+}
+
+func (r *HealthRouter) Authenticated() {
+}
+
+func (r *HealthRouter) healthz(c *fiber.Ctx) error {
+	return c.JSON(healthResponse{
+		Status:  "UP",
+		Version: r.baseConfig.CommitId,
+		Uptime:  time.Since(r.startTime).Round(time.Second).String(),
+	})
+}

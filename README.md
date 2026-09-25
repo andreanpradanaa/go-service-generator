@@ -66,6 +66,14 @@ Nama partner (pisahkan dengan koma, kosongkan jika tidak ada): dana
 - Pertanyaan juga dilewati kalau stdin bukan terminal; hasilnya tanpa external.
 - External tetap bisa ditambah nanti dengan `svcgen add external`.
 
+Setiap service punya `GET /healthz` (di `internal/router/health_router.go`) untuk probe Kubernetes:
+
+```json
+{"status":"UP","version":"<commit id>","uptime":"1m5s"}
+```
+
+Route ini di luar `/api/v1`, jadi tidak kena request filter. Isinya hanya menandakan proses hidup dan tidak mengecek postgres/redis/partner.
+
 ### Tambah partner (external client)
 
 ```bash

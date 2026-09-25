@@ -14,5 +14,6 @@ var Module = fx.Options(
 )
 
 var routerModule = fx.Provide(
+	fx.Annotate(newHealthRouter, fx.ResultTags(`group:"routes"`)),
 	// svcgen:routes
 )
