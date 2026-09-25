@@ -171,6 +171,26 @@ func InvalidFieldFormat(serviceCode, fieldName string) Response {
 	return atf(400, serviceCode, "01", "{field name}", fieldName)
 }
 
+// FromHTTPStatus maps an HTTP error raised outside this service's handlers
+// (e.g. fiber's 404 for an unknown route) to a Response with the same status.
+// Statuses without a matching table row keep the given message.
+func FromHTTPStatus(serviceCode string, httpCode int, message string) Response {
+	switch httpCode {
+	case 404:
+		return at(404, serviceCode, "02") // Invalid Routing
+	case 500:
+		return InternalServerError(serviceCode)
+	}
+	if _, ok := messages[rcKey{httpCode, "00"}]; ok {
+		return at(httpCode, serviceCode, "00")
+	}
+	return Response{
+		ResponseMessage: message,
+		HTTPStatusCode:  httpCode,
+		ResponseCode:    strconv.Itoa(httpCode) + serviceCode + "00",
+	}
+}
+
 // FromCode maps a wire response code (3-digit HTTP code + 2-digit service
 // code + 2-digit case code — the SNAP shape partners and the gateway return)
 // to this service's own Response. Unknown or malformed codes fall back to

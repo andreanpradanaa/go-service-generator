@@ -44,6 +44,13 @@ func (r *DefaultExceptionHandler) Handle(c *fiber.Ctx, err error) error {
 		err = cerror.NewInfoLevelException().Map(rc.Timeout(serviceCode))
 	}
 
+	// Errors raised by fiber itself (unknown route, method not allowed,
+	// body too large, ...) keep their HTTP status instead of becoming 500.
+	var fiberErr *fiber.Error
+	if errors.As(err, &fiberErr) {
+		err = cerror.NewInfoLevelException().Map(rc.FromHTTPStatus(serviceCode, fiberErr.Code, fiberErr.Message))
+	}
+
 	var infoLevelException *cerror.InfoLevelException
 	if errors.As(err, &infoLevelException) &&
 		infoLevelException.ResponseMessage != nil &&
