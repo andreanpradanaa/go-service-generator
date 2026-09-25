@@ -5,10 +5,14 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+{{- if .Postgres}}
 	"github.com/jackc/pgx/v5/pgxpool"
+{{- end}}
 	"github.com/rs/zerolog/log"
 	"repo-iconx.air.id/icon-digital-library/common/config"
+{{- if .Redis}}
 	"repo-iconx.air.id/icon-digital-library/common/database"
+{{- end}}
 	"repo-iconx.air.id/icon-digital-library/common/sbrest"
 )
 
@@ -20,22 +24,31 @@ const (
 )
 
 // newHealthRouter serves GET /healthz. It sits outside /api/v1 so request
-// filters scoped to that prefix do not apply. Postgres and Redis are pinged
-// only when enabled in config (common provides nil clients otherwise); any
-// failed check turns the response into 503, so use it as a readiness probe.
+// filters scoped to that prefix do not apply. Only the data sources chosen
+// when this service was generated are checked, and only while enabled in
+// config (common provides nil clients otherwise); any failed check turns the
+// response into 503, so use it as a readiness probe.
 func newHealthRouter(
 	app *fiber.App,
 	baseConfig *config.BaseConfig,
 	startTime time.Time,
+{{- if .Postgres}}
 	pgPool *pgxpool.Pool,
+{{- end}}
+{{- if .Redis}}
 	redis database.RedisClient,
+{{- end}}
 ) sbrest.Route {
 	return &HealthRouter{
 		app:        app,
 		baseConfig: baseConfig,
 		startTime:  startTime,
+{{- if .Postgres}}
 		pgPool:     pgPool,
+{{- end}}
+{{- if .Redis}}
 		redis:      redis,
+{{- end}}
 	}
 }
 
@@ -43,8 +56,12 @@ type HealthRouter struct {
 	app        *fiber.App
 	baseConfig *config.BaseConfig
 	startTime  time.Time
+{{- if .Postgres}}
 	pgPool     *pgxpool.Pool
+{{- end}}
+{{- if .Redis}}
 	redis      database.RedisClient
+{{- end}}
 }
 
 type healthResponse struct {
@@ -66,12 +83,16 @@ func (r *HealthRouter) healthz(c *fiber.Ctx) error {
 	defer cancel()
 
 	checks := map[string]func(context.Context) error{}
+{{- if .Postgres}}
 	if r.pgPool != nil {
 		checks["postgres"] = r.pgPool.Ping
 	}
+{{- end}}
+{{- if .Redis}}
 	if r.redis != nil {
 		checks["redis"] = func(ctx context.Context) error { return r.redis.Cmd().Ping(ctx).Err() }
 	}
+{{- end}}
 
 	response := healthResponse{
 		Status:  healthStatusUp,
