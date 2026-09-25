@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/andreanpradana/go-service-generator/internal/generator"
+	"github.com/andreanpradanaa/go-service-generator/internal/generator"
 )
 
 var version = "dev"
