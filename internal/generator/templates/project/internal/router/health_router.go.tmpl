@@ -1,54 +1,25 @@
 package router
 
 import (
-	"context"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-{{- if .Postgres}}
-	"github.com/jackc/pgx/v5/pgxpool"
-{{- end}}
-	"github.com/rs/zerolog/log"
 	"repo-iconx.air.id/icon-digital-library/common/config"
-{{- if .Redis}}
-	"repo-iconx.air.id/icon-digital-library/common/database"
-{{- end}}
 	"repo-iconx.air.id/icon-digital-library/common/sbrest"
 )
 
-const (
-	healthStatusUp   = "UP"
-	healthStatusDown = "DOWN"
-
-	healthCheckTimeout = 2 * time.Second
-)
-
-// newHealthRouter serves GET /healthz. It sits outside /api/v1 so request
-// filters scoped to that prefix do not apply. Only the data sources chosen
-// when this service was generated are checked, and only while enabled in
-// config (common provides nil clients otherwise); any failed check turns the
-// response into 503, so use it as a readiness probe.
+// newHealthRouter serves GET /healthz for liveness/readiness probes. It sits
+// outside /api/v1 so request filters scoped to that prefix do not apply, and
+// it only reports that the process is up — it does not ping dependencies.
 func newHealthRouter(
 	app *fiber.App,
 	baseConfig *config.BaseConfig,
 	startTime time.Time,
-{{- if .Postgres}}
-	pgPool *pgxpool.Pool,
-{{- end}}
-{{- if .Redis}}
-	redis database.RedisClient,
-{{- end}}
 ) sbrest.Route {
 	return &HealthRouter{
 		app:        app,
 		baseConfig: baseConfig,
 		startTime:  startTime,
-{{- if .Postgres}}
-		pgPool:     pgPool,
-{{- end}}
-{{- if .Redis}}
-		redis:      redis,
-{{- end}}
 	}
 }
 
@@ -56,19 +27,12 @@ type HealthRouter struct {
 	app        *fiber.App
 	baseConfig *config.BaseConfig
 	startTime  time.Time
-{{- if .Postgres}}
-	pgPool     *pgxpool.Pool
-{{- end}}
-{{- if .Redis}}
-	redis      database.RedisClient
-{{- end}}
 }
 
 type healthResponse struct {
-	Status  string            `json:"status"`
-	Version string            `json:"version"`
-	Uptime  string            `json:"uptime"`
-	Checks  map[string]string `json:"checks,omitempty"`
+	Status  string `json:"status"`
+	Version string `json:"version"`
+	Uptime  string `json:"uptime"`
 }
 
 func (r *HealthRouter) Public() {
@@ -79,41 +43,9 @@ func (r *HealthRouter) Authenticated() {
 }
 
 func (r *HealthRouter) healthz(c *fiber.Ctx) error {
-	ctx, cancel := context.WithTimeout(c.UserContext(), healthCheckTimeout)
-	defer cancel()
-
-	checks := map[string]func(context.Context) error{}
-{{- if .Postgres}}
-	if r.pgPool != nil {
-		checks["postgres"] = r.pgPool.Ping
-	}
-{{- end}}
-{{- if .Redis}}
-	if r.redis != nil {
-		checks["redis"] = func(ctx context.Context) error { return r.redis.Cmd().Ping(ctx).Err() }
-	}
-{{- end}}
-
-	response := healthResponse{
-		Status:  healthStatusUp,
+	return c.JSON(healthResponse{
+		Status:  "UP",
 		Version: r.baseConfig.CommitId,
 		Uptime:  time.Since(r.startTime).Round(time.Second).String(),
-		Checks:  make(map[string]string, len(checks)),
-	}
-	for name, check := range checks {
-		// The error (host, credentials hints) goes to the log only, not to
-		// the unauthenticated response.
-		if err := check(ctx); err != nil {
-			log.Ctx(ctx).Err(err).Str("dependency", name).Msg("Health check failed")
-			response.Checks[name] = healthStatusDown
-			response.Status = healthStatusDown
-			continue
-		}
-		response.Checks[name] = healthStatusUp
-	}
-
-	if response.Status != healthStatusUp {
-		return c.Status(fiber.StatusServiceUnavailable).JSON(response)
-	}
-	return c.JSON(response)
+	})
 }

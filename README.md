@@ -71,17 +71,13 @@ Untuk script/CI, jawaban bisa di-pipe, satu per baris:
 printf 'y\nn\ny\ny\ndana\n' | svcgen new my-svc
 ```
 
-Setiap service punya `GET /healthz` (di `internal/router/health_router.go`):
+Setiap service punya `GET /healthz` (di `internal/router/health_router.go`) untuk probe Kubernetes:
 
 ```json
-{"status":"UP","version":"<commit id>","uptime":"1m5s","checks":{"postgres":"UP","redis":"UP"}}
+{"status":"UP","version":"<commit id>","uptime":"1m5s"}
 ```
 
-- Cek Postgres/Redis hanya di-generate kalau pertanyaan `Gunakan PostgreSQL?` / `Gunakan Redis?` dijawab `y`. Jawab `N` → kodenya tidak ada sama sekali dan tidak ada ping.
-- Saat runtime, yang di-generate hanya di-ping (timeout 2 detik) selama `enable: true`; yang dimatikan lewat env tidak muncul di `checks`.
-- Kalau ada yang gagal: HTTP `503` dengan `"status":"DOWN"`. Detail error hanya ditulis ke log, tidak ke response.
-- Route ini di luar `/api/v1`, jadi tidak kena request filter.
-- Pakai sebagai **readinessProbe** Kubernetes. Kalau dipakai sebagai livenessProbe, database yang down akan membuat pod di-restart terus.
+Route ini di luar `/api/v1`, jadi tidak kena request filter. Isinya hanya menandakan proses hidup dan tidak mengecek postgres/redis/partner.
 
 ### Tambah partner (external client)
 
