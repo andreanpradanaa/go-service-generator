@@ -51,7 +51,7 @@ func TestGenerate(t *testing.T) {
 	expect := map[string][]string{
 		".gitlab-ci.yml":                    {"MANIFEST: iconpay/iconpay-test-integrator"},
 		"go.mod":                            {"module iconpay-test-integrator"},
-		"internal/router/router.go":         {"newExampleRouter", "newBalanceRouter"},
+		"internal/router/router.go":         {"newHealthRouter", "newExampleRouter", "newBalanceRouter"},
 		"internal/controller/controller.go": {"newBalanceController,"},
 		"internal/usecase/usecase.go":       {"newBalanceUsecase,"},
 		"internal/model/rc/rc.go":           {`ServiceExamplePing    = "01"`, `ServiceBalanceAccount = "02"`, `"/api/v1/balance/account": ServiceBalanceAccount`},
